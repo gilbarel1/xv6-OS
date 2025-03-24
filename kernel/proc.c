@@ -681,3 +681,81 @@ procdump(void)
     printf("\n");
   }
 }
+
+int
+forkn(int n, uint64 pids_addr) {
+  if(n < 1 || n > 16) {
+    return -1;
+  }
+
+  int i;
+  struct proc *p = myproc();
+  struct proc *np;
+  int temp_pids[16];  
+  struct proc *created[16];  
+  
+  // First create all processes without making them runnable
+  for(i = 0; i < n; i++) {
+    if((np = allocproc()) == 0) {
+      // Cleanup all previously created processes
+      for(int j = 0; j < i; j++) {
+        acquire(&created[j]->lock);
+        freeproc(created[j]);
+        release(&created[j]->lock);
+      }
+      return -1;
+    }
+    
+    // Copy user memory from parent to child
+    if(uvmcopy(p->pagetable, np->pagetable, p->sz) < 0) {
+      release(&np->lock);
+      freeproc(np);
+      // Cleanup all previously created processes
+      for(int j = 0; j < i; j++) {
+        acquire(&created[j]->lock);
+        freeproc(created[j]);
+        release(&created[j]->lock);
+      }
+      return -1;
+    }
+    
+    np->sz = p->sz;
+    *(np->trapframe) = *(p->trapframe);
+    np->trapframe->a0 = i + 1;  // Return 1 to n in children
+
+    // increment reference counts on open file descriptors
+    for(int fd = 0; fd < NOFILE; fd++) {
+      if(p->ofile[fd])
+        np->ofile[fd] = filedup(p->ofile[fd]);
+    }
+    np->cwd = idup(p->cwd);
+    safestrcpy(np->name, p->name, sizeof(p->name));
+    
+    temp_pids[i] = np->pid;
+    created[i] = np;
+
+    acquire(&wait_lock);
+    np->parent = p;
+    release(&wait_lock);
+  }
+
+  // Copy PIDs to user space
+  if(copyout(p->pagetable, pids_addr, (char *)temp_pids, n * sizeof(int)) < 0) {
+    // Cleanup all created processes on copyout failure
+    for(i = 0; i < n; i++) {
+      acquire(&created[i]->lock);
+      freeproc(created[i]);
+      release(&created[i]->lock);
+    }
+    return -1;
+  }
+
+  // Now make all processes runnable
+  for(i = 0; i < n; i++) {
+    acquire(&created[i]->lock);
+    created[i]->state = RUNNABLE;
+    release(&created[i]->lock);
+  }
+
+  return 0;  // Parent returns on success
+}

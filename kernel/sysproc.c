@@ -96,3 +96,15 @@ sys_memsize(void)
 {
   return myproc()->sz;
 }
+
+uint64
+sys_forkn(void)
+{
+  int n;
+  uint64 pids_addr;
+  // Get the first argument (number of processes)
+  argint(0, &n);
+  // Get the second argument (pointer to pids array)
+  argaddr(1, &pids_addr); 
+  return forkn(n, pids_addr);
+}

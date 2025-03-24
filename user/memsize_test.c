@@ -6,9 +6,9 @@
 
 int main(int argc, char *argv[]) {
     printf("memsize: %d\n", memsize());
-    int *p = malloc(20000);
-    printf("memsize: %d\n", memsize());
+    char *p = malloc(20000);
+    printf("memsize after malloc: %d\n", memsize());
     free(p);
-    printf("memsize: %d\n", memsize());
+    printf("memsize after release: %d\n", memsize());
     exit(0);
 }
