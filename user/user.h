@@ -24,6 +24,7 @@ int sleep(int);
 int uptime(void);
 int memsize(void);
 int forkn(int n, int* pids);
+int waitall(int* n, int* statuses);
 
 // ulib.c
 int stat(const char*, struct stat*);

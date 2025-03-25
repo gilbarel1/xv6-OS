@@ -400,7 +400,7 @@ wait(uint64 addr)
     // Scan through table looking for exited children.
     havekids = 0;
     for(pp = proc; pp < &proc[NPROC]; pp++){
-      if(pp->parent == p){
+      if(pp->parent == p){ // Found a child.
         // make sure the child isn't still in exit() or swtch().
         acquire(&pp->lock);
 
@@ -758,4 +758,78 @@ forkn(int n, uint64 pids_addr) {
   }
 
   return 0;  // Parent returns on success
+}
+
+int
+waitall(uint64 n_addr, uint64 statuses_addr) {
+  struct proc *pp;
+  int havekids;
+  int num_finished = 0;
+  int running_children = 0;
+  struct proc *p = myproc();
+  int temp_statuses[NPROC];  // Full NPROC size as required
+  
+  acquire(&wait_lock);
+
+  for(;;) {
+    // Scan through table looking for children
+    havekids = 0;
+    num_finished = 0;
+    running_children = 0;
+    
+    for(pp = proc; pp < &proc[NPROC]; pp++) {
+      if(pp->parent == p) {
+        acquire(&pp->lock);
+        havekids = 1;
+        
+        if(pp->state == ZOMBIE) {
+          // Store exit status
+          temp_statuses[num_finished] = pp->xstate;
+          num_finished++;
+          
+          // Free the zombie process
+          freeproc(pp);
+          release(&pp->lock);
+        } else {
+          running_children++;
+          release(&pp->lock);
+        }
+      }
+    }
+
+    // No children at all
+    if(!havekids) {
+      int zero = 0;
+      if(copyout(p->pagetable, n_addr, (char*)&zero, sizeof(int)) < 0) {
+        release(&wait_lock);
+        return -1;
+      }
+      release(&wait_lock);
+      return 0;
+    }
+
+    // Still have running children
+    if(running_children > 0) {
+      sleep(p, &wait_lock);
+      if(killed(p)) {
+        release(&wait_lock);
+        return -1;
+      }
+      continue;
+    }
+
+    // All children are zombies, copy results
+    if(copyout(p->pagetable, n_addr, (char*)&num_finished, sizeof(int)) < 0) {
+      release(&wait_lock);
+      return -1;
+    }
+    
+    if(copyout(p->pagetable, statuses_addr, (char*)temp_statuses, num_finished * sizeof(int)) < 0) {
+      release(&wait_lock);
+      return -1;
+    }
+    
+    release(&wait_lock);
+    return 0;
+  }
 }

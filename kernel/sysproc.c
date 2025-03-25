@@ -108,3 +108,15 @@ sys_forkn(void)
   argaddr(1, &pids_addr); 
   return forkn(n, pids_addr);
 }
+
+uint64
+sys_waitall(void)
+{
+  int n;
+  uint64 statuses_addr;
+  // Get the first argument (number of processes)
+  argint(0, &n);
+  // Get the second argument (pointer to statuses array)
+  argaddr(1, &statuses_addr); 
+  return waitall(n, statuses_addr);
+}
