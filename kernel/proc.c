@@ -708,8 +708,8 @@ forkn(int n, uint64 pids_addr) {
     
     // Copy user memory from parent to child
     if(uvmcopy(p->pagetable, np->pagetable, p->sz) < 0) {
-      release(&np->lock);
       freeproc(np);
+      release(&np->lock);
       // Cleanup all previously created processes
       for(int j = 0; j < i; j++) {
         acquire(&created[j]->lock);
@@ -737,6 +737,8 @@ forkn(int n, uint64 pids_addr) {
     acquire(&wait_lock);
     np->parent = p;
     release(&wait_lock);
+
+    release(&np->lock);
   }
 
   // Copy PIDs to user space
@@ -763,7 +765,7 @@ forkn(int n, uint64 pids_addr) {
 int
 waitall(uint64 n_addr, uint64 statuses_addr) {
   struct proc *pp;
-  int havekids;
+  int havekids = 0;
   int num_finished = 0;
   int running_children = 0;
   struct proc *p = myproc();
@@ -774,7 +776,6 @@ waitall(uint64 n_addr, uint64 statuses_addr) {
   for(;;) {
     // Scan through table looking for children
     havekids = 0;
-    num_finished = 0;
     running_children = 0;
     
     for(pp = proc; pp < &proc[NPROC]; pp++) {
