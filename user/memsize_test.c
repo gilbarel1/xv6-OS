@@ -10,5 +10,5 @@ int main(int argc, char *argv[]) {
     printf("memsize: %d\n", memsize());
     free(p);
     printf("memsize: %d\n", memsize());
-    exit(0);
+    exit(0, "memsize_test complete");
 }
