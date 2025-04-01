@@ -733,6 +733,7 @@ forkn(int n, uint64 pids_addr) {
     
     temp_pids[i] = np->pid;
     created[i] = np;
+    created[i]->state = USED;
 
     acquire(&wait_lock);
     np->parent = p;
