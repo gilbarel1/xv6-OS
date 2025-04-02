@@ -145,7 +145,7 @@ found:
   memset(&p->context, 0, sizeof(p->context));
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
-
+  memset(p->exit_msg, 0, sizeof(p->exit_msg));
   return p;
 }
 
@@ -344,12 +344,18 @@ reparent(struct proc *p)
 // An exited process remains in the zombie state
 // until its parent calls wait().
 void
-exit(int status)
+exit(int status, char *msg)
 {
   struct proc *p = myproc();
 
   if(p == initproc)
     panic("init exiting");
+
+  // Copy the exit message to the process structure
+  strncpy(p->exit_msg, msg, sizeof(p->exit_msg) - 1);
+  p->exit_msg[sizeof(p->exit_msg) - 1] = '\0';  // Ensure null termination
+  // Set exit status
+  p->xstate = status;
 
   // Close all open files.
   for(int fd = 0; fd < NOFILE; fd++){
@@ -388,7 +394,7 @@ exit(int status)
 // Wait for a child process to exit and return its pid.
 // Return -1 if this process has no children.
 int
-wait(uint64 addr)
+wait(uint64 addr, char* msg)
 {
   struct proc *pp;
   int havekids, pid;
@@ -410,6 +416,12 @@ wait(uint64 addr)
           pid = pp->pid;
           if(addr != 0 && copyout(p->pagetable, addr, (char *)&pp->xstate,
                                   sizeof(pp->xstate)) < 0) {
+            release(&pp->lock);
+            release(&wait_lock);
+            return -1;
+          }
+          // Copy the exit message to the parent's address space
+          if(copyout(p->pagetable, (uint64)msg, pp->exit_msg, sizeof(pp->exit_msg)) < 0) {
             release(&pp->lock);
             release(&wait_lock);
             return -1;

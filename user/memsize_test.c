@@ -9,6 +9,6 @@ int main(int argc, char *argv[]) {
     char *p = malloc(20000);
     printf("memsize after malloc: %d\n", memsize());
     free(p);
-    printf("memsize after release: %d\n", memsize());
-    exit(0);
+    printf("memsize: %d\n", memsize());
+    exit(0, "memsize_test complete");
 }
